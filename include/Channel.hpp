@@ -107,6 +107,7 @@ class Channel {
 	}
 
 	int duplicates() const { return _duplicates; }
+	bool mqtt() const { return _mqtt; }
 
   private:
 	static int instances;
@@ -127,6 +128,7 @@ class Channel {
 	std::string _uuid;        // unique identifier for middleware
 	std::string _apiProtocol; // protocol of api to use for logging
 	int _duplicates;          // how to handle duplicate values (see conf)
+	bool _mqtt;               // whether output to via mqtt client is enabled
 };
 
 #endif /* _CHANNEL_H_ */

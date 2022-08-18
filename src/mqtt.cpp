@@ -262,7 +262,7 @@ void MqttClient::publish(Channel::Ptr ch, Reading &rds, bool aggregate) {
 	// for now we do only call this from read_thread and our mqtt_client thread doesn't harm here
 	// mosquitto_publish doesn't seem to be blocking. needs further investigation!
 
-	if (!ch)
+	if (!ch || !ch->mqtt())
 		return;
 	if (!_mcs)
 		return;
