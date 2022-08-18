@@ -63,6 +63,8 @@ MqttClient::MqttClient(struct json_object *option) : _enabled(false) {
 				_timestamp = json_object_get_boolean(local_value);
 			} else if (strcmp(key, "id") == 0 && local_type == json_type_string) {
 				_id = json_object_get_string(local_value);
+			} else if (strcmp(key, "generateTopicWithUuid") == 0 && local_type == json_type_boolean) {
+				_generateTopicWithUuid = json_object_get_boolean(local_value);
 			} else {
 				print(log_alert, "Ignoring invalid field or type: %s=%s", NULL, key,
 					  json_object_get_string(local_value));
@@ -226,12 +228,16 @@ MqttClient::~MqttClient() {
 	mosquitto_lib_cleanup(); // this assumes nobody else is using libmosquitto!
 }
 
-void MqttClient::ChannelEntry::generateNames(const std::string &prefix, Channel &ch) {
+void MqttClient::ChannelEntry::generateNames(const std::string &prefix, Channel &ch, bool generateTopicWithUuid) {
 	_announceValues.clear();
 	_fullTopicRaw = prefix;
-	_fullTopicRaw += ch.name(); // todo this converts from std::string to const char and back...
+	 std::string uuid = ch.uuid();
+	 if (generateTopicWithUuid && uuid.length())
+		_fullTopicRaw += uuid;
+	 else
+		_fullTopicRaw += ch.name(); // todo this converts from std::string to const char and back...
 	_fullTopicRaw += '/';
-	if (ch.identifier()) {
+	if (ch.identifier() && !(*ch.identifier() == NilIdentifier::Instance)) {
 		char unparseBuf[200];
 		unparseBuf[0] = 0;
 		if (ch.identifier()->unparse(unparseBuf, sizeof(unparseBuf))) {
@@ -246,8 +252,7 @@ void MqttClient::ChannelEntry::generateNames(const std::string &prefix, Channel 
 	_announceName = _fullTopicRaw;
 
 	_fullTopicRaw += "raw";
-	_fullTopicAgg += "agg";
-	std::string uuid = ch.uuid();
+	_fullTopicAgg += "agg";	
 	if (uuid.length())
 		_announceValues.emplace_back("uuid", uuid);
 }
@@ -267,7 +272,7 @@ void MqttClient::publish(Channel::Ptr ch, Reading &rds, bool aggregate) {
 	auto it = _chMap.find(ch->name());
 	if (it == _chMap.end()) {
 		ChannelEntry entry;
-		entry.generateNames(_topic, (*ch));
+		entry.generateNames(_topic, (*ch), _generateTopicWithUuid);
 		if (entry._sendAgg && !_rawAndAgg)
 			entry._sendRaw = false;
 

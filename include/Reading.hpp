@@ -145,6 +145,8 @@ class ChannelIdentifier : public ReadingIdentifier {
 
 class NilIdentifier : public ReadingIdentifier {
   public:
+    static NilIdentifier Instance;
+    
 	NilIdentifier() {}
 	size_t unparse(char *buffer, size_t n);
 	bool operator==(NilIdentifier const &) const { return true; }

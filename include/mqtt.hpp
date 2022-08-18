@@ -48,6 +48,7 @@ class MqttClient {
 	std::string _id;
 	int _qos = 0;
 	bool _timestamp = false;
+	bool _generateTopicWithUuid = false;
 
 	bool _isConnected = false;
 
@@ -61,7 +62,7 @@ class MqttClient {
 		std::string _fullTopicAgg;
 		std::string _announceName;
 		std::vector<std::pair<std::string, std::string>> _announceValues;
-		void generateNames(const std::string &prefix, Channel &ch);
+		void generateNames(const std::string &prefix, Channel &ch, bool generateTopicWithUuid);
 	};
 	std::mutex _chMapMutex;
 	std::unordered_map<std::string, ChannelEntry> _chMap;

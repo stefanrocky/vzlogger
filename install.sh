@@ -155,7 +155,7 @@ if ! git_is_repo . vzlogger ; then
 fi
 
 if [ -z "$1" ] || contains "$*" vzlogger; then
-	git_update . https://github.com/volkszaehler/vzlogger.git vzlogger
+	git_update . https://github.com/stefanrocky/vzlogger.git vzlogger
 fi
 
 
@@ -264,7 +264,7 @@ if [ -z "$1" ] || contains "$*" vzlogger; then
 
         echo
         echo "building vzlogger"
-        cmake -DBUILD_TEST=off ..
+        cmake -DBUILD_TEST=off -DENABLE_MQTT=on ..
         make
 
         echo

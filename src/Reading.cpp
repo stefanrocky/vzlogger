@@ -190,6 +190,8 @@ size_t ChannelIdentifier::unparse(char *buffer, size_t n) {
 					(_channel > 0) ? "power" : "consumption");
 }
 
+NilIdentifier NilIdentifier::Instance;
+
 size_t NilIdentifier::unparse(char *buffer, size_t n) {
 	return snprintf(buffer, n, "NilIdentifier");
 	// buffer[0] = '\0';
