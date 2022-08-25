@@ -105,6 +105,7 @@ ReadingIdentifier::Ptr reading_id_parse(meter_protocol_t protocol, const char *s
 	case meter_protocol_s0:
 	case meter_protocol_ocr:
 	case meter_protocol_w1therm:
+	case meter_protocol_mqtt:
 		rid = ReadingIdentifier::Ptr(new StringIdentifier(string));
 		break;
 

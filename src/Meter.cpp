@@ -46,6 +46,9 @@
 #ifdef OMS_SUPPORT
 #include "protocols/MeterOMS.hpp"
 #endif
+#ifdef ENABLE_MQTT
+#include "protocols/MeterMQTT.hpp"
+#endif
 //#include <protocols/.h>
 
 #define METER_DETAIL(NAME, CLASSNAME, DESC, MAX_RDS)                                               \
@@ -70,6 +73,9 @@ static const meter_details_t protocols[] = {
 	METER_DETAIL(w1therm, W1therm, "W1-therm / 1wire temperature devices", 400),
 #ifdef OMS_SUPPORT
 	METER_DETAIL(oms, OMS, "OMS (M-BUS) protocol based devices", 100),
+#endif
+#ifdef ENABLE_MQTT
+	METER_DETAIL(mqtt, MQTT, "MQTT subscriptions", 100),
 #endif
 	//{} /* stop condition for iterator */
 	METER_DETAIL(none, NULL, NULL, 0),
@@ -185,6 +191,12 @@ Meter::Meter(std::list<Option> pOptions) : _name("meter") {
 	case meter_protocol_oms:
 		_protocol = vz::protocol::Protocol::Ptr(new MeterOMS(pOptions));
 		_identifier = ReadingIdentifier::Ptr(new ObisIdentifier());
+		break;
+#endif
+#ifdef ENABLE_MQTT
+	case meter_protocol_mqtt:
+		_protocol = vz::protocol::Protocol::Ptr(new MeterMQTT(pOptions));
+		_identifier = ReadingIdentifier::Ptr(new StringIdentifier());
 		break;
 #endif
 	default:

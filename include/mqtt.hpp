@@ -20,17 +20,23 @@ class MqttClient {
 	MqttClient(struct json_object *option);
 	MqttClient() = delete;                   // no default constr.
 	MqttClient(const MqttClient &) = delete; // no copy constr.
-	~MqttClient();
+	virtual ~MqttClient();
 	bool isConfigured() const;
-
+	bool isConnected() const { return _isConnected; }
+	
 	void publish(Channel::Ptr ch, Reading &rds,
 				 bool aggregate = false); // thread safe, non blocking
+				 
+	virtual bool subscribe(const std::string& sub) { return false; }
+	virtual void unsubscribe(const std::string& sub) {}
+	virtual size_t receive(const std::string& sub, std::vector<std::string>& data) { return 0; }
+	
   protected:
 	friend void *mqtt_client_thread(void *);
-	void connect_callback(struct mosquitto *mosq, int result);
-	void disconnect_callback(struct mosquitto *mosq, int result);
-	void message_callback(struct mosquitto *mosq, const struct mosquitto_message *msg);
-
+	virtual void connect_callback(struct mosquitto *mosq, int result);
+	virtual void disconnect_callback(struct mosquitto *mosq, int result);
+	virtual void message_callback(struct mosquitto *mosq, const struct mosquitto_message *msg);
+    
 	bool _enabled;
 	std::string _host;
 	int _port = 0;

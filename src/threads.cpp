@@ -115,11 +115,11 @@ void *reading_thread(void *arg) {
 				if (n > 0)
 					for (MeterMap::iterator ch = mapping->begin(); ch != mapping->end(); ch++) {
 
-						// print(log_debug, "Check channel %s, n=%d", mtr->name(), ch->name(), n);
+						// print(log_debug, "Check channel %s, n=%d", mtr->name(), (*ch)->name(), n);
 
 						for (size_t i = 0; i < n; i++) {
 							if (*rds[i].identifier().get() == *(*ch)->identifier().get()) {
-								// print(log_debug, "found channel", mtr->name());
+								// print(log_debug, "Found channel %s == %s", mtr->name(), rds[i].identifier().get()->toString().c_str(), (*ch)->identifier().get()->toString().c_str());
 								if ((*ch)->time_ms() < rds[i].time_ms()) {
 									(*ch)->last(&rds[i]);
 								}
@@ -140,7 +140,9 @@ void *reading_thread(void *arg) {
 									mqttClient->publish((*ch), rds[i]);
 								}
 #endif
-							}
+							} else {
+								// print(log_debug, "Invalid Channel %s == %s", mtr->name(), rds[i].identifier().get()->toString().c_str(), (*ch)->identifier().get()->toString().c_str());
+							}							
 						}
 
 					}                                                   // channel loop

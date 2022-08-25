@@ -33,7 +33,7 @@
 #include <Config_Options.hpp>
 #include <VZException.hpp>
 #ifdef ENABLE_MQTT
-#include "mqtt.hpp"
+#include "mqttex.hpp"
 #endif
 
 static const char *option_type_str[] = {"null",   "boolean", "double", "int",
@@ -169,7 +169,7 @@ void Config_Options::config_parse(MapContainer &mappings) {
 #ifdef ENABLE_MQTT
 			else if ((strcmp(key, "mqtt") == 0) && type == json_type_object) {
 				if (!mqttClient) {
-					mqttClient = new MqttClient(value);
+					mqttClient = new MqttClientEx(value);
 					if (!mqttClient->isConfigured()) {
 						delete mqttClient;
 						mqttClient = 0;
