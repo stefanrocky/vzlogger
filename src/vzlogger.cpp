@@ -156,7 +156,7 @@ void print(log_level_t level, const char *format, const char *id, ...) {
 
 	struct timeval now;
 	struct tm *timeinfo;
-	char prefix[27];
+	char prefix[32];
 	size_t pos = 0;
 
 	gettimeofday(&now, NULL);
@@ -165,6 +165,32 @@ void print(log_level_t level, const char *format, const char *id, ...) {
 	/* format timestamp */
 	pos += strftime(prefix + pos, 18, "[%b %d %H:%M:%S]", timeinfo);
 
+    /* format level */
+    switch (level) {
+		case log_alert:
+			strcpy(prefix + pos, "[!!!]");
+			break;
+		case log_error:
+			strcpy(prefix + pos, "[ERR]");
+			break;
+		case log_warning:
+			strcpy(prefix + pos, "[WRN]");
+			break;
+		case log_info:
+			strcpy(prefix + pos, "[INF]");
+			break;
+		case log_debug:
+			strcpy(prefix + pos, "[DBG]");
+			break;
+		case log_finest:
+			strcpy(prefix + pos, "[dbg]");
+			break;
+		default:
+			strcpy(prefix + pos, "[UNK]");
+			break;
+	}
+	pos += 5;
+	
 	/* format section */
 	if (id) {
 		snprintf(prefix + pos, 9, "[%s]", (char *)id);
@@ -177,7 +203,7 @@ void print(log_level_t level, const char *format, const char *id, ...) {
 		FILE *stream = (level > 0) ? stdout : stderr;
 
 		m_log.lock(); // safe write access for competed access from other thread
-		fprintf(stream, "%-26s", prefix);
+		fprintf(stream, "%-31s", prefix);
 		vfprintf(stream, format, args);
 		fprintf(stream, "\n");
 		m_log.unlock(); // release mutex
@@ -188,14 +214,14 @@ void print(log_level_t level, const char *format, const char *id, ...) {
 	/* append to logfile */
 	m_log.lock(); // safe write access for competed access from other thread
 	if (options.logfd()) {
-		fprintf(options.logfd(), "%-24s", prefix);
+		fprintf(options.logfd(), "%-31s", prefix);
 		vfprintf(options.logfd(), format, args);
 		fprintf(options.logfd(), "\n");
 		fflush(options.logfd());
 	} else if (gStartLogBuf) {
 		char buf[500];
 		int bufUsed;
-		bufUsed = snprintf(buf, 500, "%-24s", prefix);
+		bufUsed = snprintf(buf, 500, "%-31s", prefix);
 		bufUsed += vsnprintf(buf + bufUsed, bufUsed < 500 ? 500 - bufUsed : 0, format, args);
 		bufUsed += snprintf(buf + bufUsed, bufUsed < 500 ? 500 - bufUsed : 0, "\n");
 		gStartLogBuf->sputn(buf, bufUsed < 500 ? bufUsed : 500);
