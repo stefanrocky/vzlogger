@@ -201,3 +201,13 @@ void OptionList::dump(std::list<Option> const &options) {
 		std::cout << (*it) << std::endl;
 	}
 }
+
+bool OptionList::contains(std::list<Option> const &options, const std::string &key) const {
+	for (const_iterator it = options.cbegin(); it != options.cend(); ++it) {
+		if (it->key() == key) {
+			return true;
+		}
+	}
+	return false;
+}
+

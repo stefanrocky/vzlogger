@@ -97,6 +97,7 @@ class OptionList { //: public List<Option> {
 	typedef std::list<Option>::iterator iterator;
 	typedef std::list<Option>::const_iterator const_iterator;
 
+	bool contains(std::list<Option> const &options, const std::string &key) const;
 	const Option &lookup(std::list<Option> const &options, const std::string &key) const;
 	const char *lookup_string(std::list<Option> const &options, const char *key) const;
 	const char *lookup_string_tolower(std::list<Option> const &options, const char *key) const;
