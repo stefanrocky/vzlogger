@@ -156,7 +156,7 @@ void print(log_level_t level, const char *format, const char *id, ...) {
 
 	struct timeval now;
 	struct tm *timeinfo;
-	char prefix[24];
+	char prefix[27];
 	size_t pos = 0;
 
 	gettimeofday(&now, NULL);
@@ -167,7 +167,7 @@ void print(log_level_t level, const char *format, const char *id, ...) {
 
 	/* format section */
 	if (id) {
-		snprintf(prefix + pos, 8, "[%s]", (char *)id);
+		snprintf(prefix + pos, 9, "[%s]", (char *)id);
 	}
 
 	va_list args;
@@ -177,7 +177,7 @@ void print(log_level_t level, const char *format, const char *id, ...) {
 		FILE *stream = (level > 0) ? stdout : stderr;
 
 		m_log.lock(); // safe write access for competed access from other thread
-		fprintf(stream, "%-24s", prefix);
+		fprintf(stream, "%-26s", prefix);
 		vfprintf(stream, format, args);
 		fprintf(stream, "\n");
 		m_log.unlock(); // release mutex
