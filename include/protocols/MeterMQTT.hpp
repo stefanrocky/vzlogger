@@ -26,7 +26,7 @@ class MeterMQTT : public vz::protocol::Protocol {
 	MeterMQTT(std::list<Option> options);
 	virtual ~MeterMQTT();
 
-	ssize_t read(std::vector<Reading> &rds, size_t n);
+	ssize_t read(std::vector<Reading> &rds, size_t rds_max);
 	//virtual bool allowInterval() const {
 	//	return false;
 	//} // don't allow conf setting interval with MQTT
@@ -38,13 +38,13 @@ class MeterMQTT : public vz::protocol::Protocol {
 	std::string _subscription;
 	std::string _data_format;
 	std::string _data_query_time;
-	std::string _data_query_value;
+	std::vector<std::string> _data_query_values;
 	// 0 = ms, 1 = s
 	int _time_unit;
 	bool _use_local_time;
 	bool _open;
 	
-	bool parse(const std::string& msg, Reading* rd);
+	ssize_t parse(const std::string& msg, std::vector<Reading> &rds, size_t rds_pos, size_t rds_max);
 	
 private:
     void test();	

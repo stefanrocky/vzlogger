@@ -72,11 +72,34 @@ MeterMQTT::MeterMQTT(std::list<Option> options)
 	}
 	
 	try {
-		_data_query_value = optlist.lookup_string(options, "data_query_value");
-		if (_subscription.length() == 0)
-			throw vz::OptionNotFoundException("data_query_value empty"); 
+		const Option& opt = optlist.contains(options, "data_query_values") ? optlist.lookup(options, "data_query_values") : optlist.lookup(options, "data_query_value");
+		std::string query_value;
+		if (opt.type() == Option::type_array) {			
+			struct json_object *jso = (json_object *)opt;
+			if (jso) {
+				int count = json_object_array_length(jso);
+				for (int idx = 0; idx < count; idx++) {
+					struct json_object *jb = json_object_array_get_idx(jso, idx);
+					if (jb) {
+						query_value = json_object_get_string(jb);
+						if (query_value.size() > 0)
+							_data_query_values.push_back(query_value);
+					} 
+				}
+			} 
+		}		
+		else if (opt.type() == Option::type_string) {
+			query_value = (const char *)opt;
+			if (query_value.size() > 0)
+				_data_query_values.push_back(query_value);
+		}
+		else {
+			throw vz::OptionNotFoundException("data_query_value(s) has invalid type"); 
+		}
+		if (_data_query_values.size() == 0)
+			throw vz::OptionNotFoundException("data_query_value(s) empty"); 
 	} catch (vz::OptionNotFoundException &e) {
-		print(log_alert, "Missing data_query_value", name().c_str());
+		print(log_alert, "Missing data_query_value(s)", name().c_str());
 		throw;		
 	}	
 	
@@ -110,10 +133,11 @@ MeterMQTT::MeterMQTT(std::list<Option> options)
 	}
 
 	print(log_info, "Initialized: subscription: %s", name().c_str(), _subscription.c_str());
-	print(log_info, "data_query_value: %s", name().c_str(), _data_query_value.c_str());
+	for (size_t idx = 0; idx < _data_query_values.size(); idx++)
+		print(log_info, "data_query_value[%u]: %s", name().c_str(), idx, _data_query_values[idx].c_str());
 	print(log_info, "data_query_time: %s, unit: %d", name().c_str(), _data_query_time.c_str(), _time_unit);
 
-	test();
+	//test();
 }
 
 MeterMQTT::~MeterMQTT() {
@@ -142,71 +166,91 @@ int MeterMQTT::close() {
 	return SUCCESS;
 }
 
-ssize_t MeterMQTT::read(std::vector<Reading> &rds, size_t n) {
+ssize_t MeterMQTT::read(std::vector<Reading> &rds, size_t rds_max) {
 	if (_open && mqttClient)	{
 		std::vector<std::string> data;
 		size_t len = mqttClient->receive(_subscription, data);
 		if (len > 0) {
-			size_t m = 0;
-			for (auto it = data.begin(); it != data.end() && m < n; ++it) {
-				if (parse(*it, &rds[m])) {
-					m++;
+			size_t rds_pos = 0;
+			size_t parsed = 0;
+			if (rds.size() < rds_max)
+				rds_max = rds.size();
+			for (auto it = data.begin(); it != data.end() && rds_pos < rds_max; ++it) {				
+				ssize_t res = parse(*it, rds, rds_pos, rds_max);
+				if (res < 0) {
+					print(log_error, "Parsing aborted, %d data-messages lost", name().c_str(), data.size() - parsed);
+					break;
 				}
+				parsed++;
+				rds_pos += res;				
 			}
-			return m;
+			return rds_pos;
 		}
 	}	
 	return 0;
 }
 
-bool MeterMQTT::parse(const std::string& msg, Reading* rd) {
-	if (rd == NULL || msg.size() == 0)
-		return false;
+ssize_t MeterMQTT::parse(const std::string& msg, std::vector<Reading> &rds, size_t rds_pos, size_t rds_max) {
+	if (rds_pos >= rds_max)
+		return -1;
 		
-	bool ret = false;
+	ssize_t res = 0;
 	struct json_object *json_data = NULL;
 	struct json_tokener *json_tok = json_tokener_new();
 	
 	json_data = json_tokener_parse_ex(json_tok, msg.c_str(), msg.length());
 	if (json_tok->err == json_tokener_success) {
-		std::string id;
-		struct json_object *jvalue = json_path_single(json_data, _data_query_value.c_str(), &id, 2, json_type_double, json_type_int);
-		if (jvalue) {
-			rd->value( json_object_get_double(jvalue) );
-			ret = true;
+		struct timeval tv;
+		bool tv_valid = false;
+		
+		for (size_t idx = 0; idx < _data_query_values.size() && rds_pos < rds_max; idx++) {
+			std::string query_value = _data_query_values[idx];
+			std::string id;
+			struct json_object *jvalue = json_path_single(json_data, query_value.c_str(), &id, 2, json_type_double, json_type_int);
+			if (jvalue) {
+				rds[rds_pos].value( json_object_get_double(jvalue) );				
 			
-			ReadingIdentifier *rid(new StringIdentifier(id));
-			rd->identifier(rid);
-			
-			struct timeval tv;
-			if (!_use_local_time) {
-				struct json_object *jtime = json_path_single(json_data, _data_query_time.c_str(), 2, json_type_int, json_type_double);
-				if (jtime) {
-					int64_t t = json_object_get_int64(jtime);
-					if (_time_unit == 0) {
-						tv.tv_sec = (long)(t / 1000);
-						tv.tv_usec = (long)(t % 1000) * 1000;						
-					} else if (_time_unit == 1) {					
-						tv.tv_sec = (long)t;
-						tv.tv_usec = 0;
+				ReadingIdentifier *rid(new StringIdentifier(id));
+				rds[rds_pos].identifier(rid);
+				
+				if (!tv_valid) {				
+					if (!_use_local_time) {
+						struct json_object *jtime = json_path_single(json_data, _data_query_time.c_str(), 2, json_type_int, json_type_double);
+						if (jtime) {
+							int64_t t = json_object_get_int64(jtime);
+							if (_time_unit == 0) {
+								tv.tv_sec = (long)(t / 1000);
+								tv.tv_usec = (long)(t % 1000) * 1000;	
+								tv_valid = true;					
+							} else if (_time_unit == 1) {					
+								tv.tv_sec = (long)t;
+								tv.tv_usec = 0;
+								tv_valid = true;
+							} 
+						}															
 					} else {
-						ret = false;
-					}					
-				} else {
-					ret = false;
+						gettimeofday(&tv, NULL); /* use local time */
+						tv_valid = true;
+					}
 				}
+				
+				if (!tv_valid) {
+					print(log_finest, "Time '%s' not found in object: %s", name().c_str(), _data_query_time.c_str(), json_object_to_json_string(json_data)); 	
+					break;
+				}
+				
+				rds[rds_pos].time(tv);
+				res++;
+				rds_pos++;
 			} else {
-				gettimeofday(&tv, NULL); /* use local time */
+				print(log_finest, "Value '%s' not found in object: %s", name().c_str(), query_value.c_str(), json_object_to_json_string(json_data)); 	
 			}
-			rd->time(tv);
-		} else {
-			print(log_finest, "Value '%s' not found in object: %s", name().c_str(), _data_query_value.c_str(), json_object_to_json_string(json_data)); 	
 		}
 		json_object_put(json_data);	
 	}
 	
 	json_tokener_free(json_tok);
-	return ret;	
+	return res;	
 }
 
 void MeterMQTT::test() {
