@@ -113,7 +113,7 @@ MeterMQTT::MeterMQTT(std::list<Option> options)
 	print(log_info, "data_query_value: %s", name().c_str(), _data_query_value.c_str());
 	print(log_info, "data_query_time: %s, unit: %d", name().c_str(), _data_query_time.c_str(), _time_unit);
 
-	//test();
+	test();
 }
 
 MeterMQTT::~MeterMQTT() {
@@ -180,7 +180,7 @@ bool MeterMQTT::parse(const std::string& msg, Reading* rd) {
 			
 			struct timeval tv;
 			if (!_use_local_time) {
-				struct json_object *jtime = json_path_single(json_data, _data_query_time.c_str(), 1, json_type_int);
+				struct json_object *jtime = json_path_single(json_data, _data_query_time.c_str(), 2, json_type_int, json_type_double);
 				if (jtime) {
 					int64_t t = json_object_get_int64(jtime);
 					if (_time_unit == 0) {
@@ -235,7 +235,7 @@ void MeterMQTT::test() {
     "'id': 0,"
     "'source': 'timer',"
     "'output': true,"
-    "'timer_started_at': 1626935739.79,"
+    "'ts': 1626935739.79,"
     "'timer_duration': 60,"
     "'apower': 8.9,"
     "'voltage': 237.5,"
@@ -274,6 +274,11 @@ void MeterMQTT::test() {
 
 	jvalue = json_path_single(obj, path.c_str(), 1, json_type_boolean);
 	print(log_finest, "test: path='%s' found: %s", name().c_str(), path.c_str(), json_object_to_json_string(jvalue)); 	
+	
+	path.assign("$.switch:0.ts");
+	jvalue = json_path_single(obj, path.c_str(), 2, json_type_int, json_type_double );
+	int64_t ts = json_object_get_int64(jvalue);	
+	print(log_finest, "test: path='%s' found: %s, ts-int64=%lld", name().c_str(), path.c_str(), json_object_to_json_string(jvalue), ts); 
 	
 	path.assign("$.switch:0.apower");
 	jvalue = json_path_single(obj, path.c_str(), 2, json_type_double, json_type_int);
