@@ -108,35 +108,35 @@ Option::~Option() {
 
 Option::operator const char *() const {
 	if (_type != type_string)
-		throw vz::InvalidTypeException("not a string");
+		throw vz::InvalidTypeException("Invalid type: expected string");
 
 	return _value_string.c_str();
 }
 
 Option::operator int() const {
 	if (_type != type_int)
-		throw vz::InvalidTypeException("Invalid type");
+		throw vz::InvalidTypeException("Invalid type: expected int");
 
 	return value.integer;
 }
 
 Option::operator double() const {
 	if (_type != type_double)
-		throw vz::InvalidTypeException("Invalid type");
+		throw vz::InvalidTypeException("Invalid type: expected double");
 
 	return value.floating;
 }
 
 Option::operator bool() const {
 	if (_type != type_boolean)
-		throw vz::InvalidTypeException("Invalid type");
+		throw vz::InvalidTypeException("Invalid type: expected bool");
 
 	return value.boolean;
 }
 
 Option::operator struct json_object *() const {
 	if (_type != type_array && _type != type_object)
-		throw vz::InvalidTypeException("json_object not an array/object");
+		throw vz::InvalidTypeException("Invalid type: json_object not an array/object");
 	return value.jso;
 }
 
