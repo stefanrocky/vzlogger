@@ -58,6 +58,16 @@ Reading &Reading::operator=(const Reading &orig) {
 	return *this;
 }
 
+void Reading::time_get(struct timeval* ptime) const {
+	if(ptime)
+		*ptime = _time;
+}
+
+void Reading::time_from_ms( int64_t &ms ) {
+	_time.tv_usec = (long int)(ms % 1000) * 1000;
+	_time.tv_sec = (long int)(ms / 1000);
+}
+
 void Reading::time_from_double(double const &ts) {
 	double integral;
 	double fraction = modf(ts, &integral);

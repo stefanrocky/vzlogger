@@ -66,9 +66,7 @@ template <class T> bool isEqual(const T &obj, const ReadingIdentifier *other) {
 } // namespace detail
 
 class ObisIdentifier : public ReadingIdentifier {
-
   public:
-	typedef vz::shared_ptr<ObisIdentifier> Ptr;
 
 	ObisIdentifier() {}
 	ObisIdentifier(Obis obis) : _obis(obis) {}
@@ -120,7 +118,6 @@ class StringIdentifier : public ReadingIdentifier {
 };
 
 class ChannelIdentifier : public ReadingIdentifier {
-
   public:
 	ChannelIdentifier() {}
 	ChannelIdentifier(int channel) : _channel(channel) {}
@@ -183,17 +180,19 @@ class Reading {
 	const long &time_s() const {
 		return _time.tv_sec;
 	}; // return only the seconds (always rounding down)
+	void time_get(struct timeval* ptime) const;
 	void time() { gettimeofday(&_time, NULL); }
 	void time(struct timeval const &v) { _time = v; }
 	void time(struct timespec const &v) {
 		_time.tv_sec = v.tv_sec;
 		_time.tv_usec = v.tv_nsec / 1e3;
 	}
-	// not needed yet: void time_from_ms( int64_t &ms );
+	void time_from_ms(int64_t &ms);
 	void time_from_double(double const &d);
 
 	void identifier(ReadingIdentifier *rid) { _identifier.reset(rid); }
-	const ReadingIdentifier::Ptr identifier() { return _identifier; }
+	void identifier(ReadingIdentifier::Ptr rid) { _identifier = rid; }
+	ReadingIdentifier::Ptr identifier() const { return _identifier; }
 
 	/**
 	 * Print identifier to buffer for debugging/dump
