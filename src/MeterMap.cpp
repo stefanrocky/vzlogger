@@ -65,7 +65,7 @@ void MeterMap::start() {
 		pthread_create(&_thread, NULL, &reading_thread, (void *)this);
 		print(log_debug, "Meter thread started", _meter->name());
 
-		print(log_debug, "Meter is opened. Starting channels.", _meter->name());
+		print(log_debug, "Meter is opened. Starting %u channels.", _meter->name(), size());
 		for (iterator it = _channels.begin(); it != _channels.end(); it++) {
 			(*it)->start(*it);
 			print(log_debug, "Logging thread started", (*it)->name());

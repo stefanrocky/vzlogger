@@ -53,12 +53,10 @@ class MeterMap {
 	typedef std::vector<Channel::Ptr>::iterator iterator;
 	typedef std::vector<Channel::Ptr>::const_iterator const_iterator;
 
-	MeterMap(const std::list<Option> &options) : _meter(new Meter(options)) {
-		_thread_running = false;
-	}
+	MeterMap(const std::list<Option> &options) : _meter(new Meter(options)), _thread_running(false){};
 	MeterMap(Meter *m) : _meter(m), _thread_running(false){};
 	~MeterMap(){};
-	Meter::Ptr meter() { return _meter; }
+	Meter::Ptr meter() const { return _meter; }
 
 	/**
 		 If the meter is enabled, start the meter and all its channels.
@@ -81,7 +79,7 @@ class MeterMap {
 	inline void push_back(Channel::Ptr channel) { _channels.push_back(channel); }
 	inline iterator begin() { return _channels.begin(); }
 	inline iterator end() { return _channels.end(); }
-	inline size_t size() { return _channels.size(); }
+	inline size_t size() const { return _channels.size(); }
 
 	bool running() const { return _thread_running; }
 

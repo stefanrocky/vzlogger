@@ -53,8 +53,7 @@ void *reading_thread(void *arg) {
 	bool first_reading = true;
 
 	details = meter_get_details(mtr->protocolId());
-	std::vector<Reading> rds(details->max_readings, Reading(mtr->identifier()));
-	;
+	std::vector<Reading> rds(mtr->adapt_max_readings(details->max_readings, mapping->size()), Reading(mtr->identifier()));
 
 	print(log_debug, "Number of readers: %d", mtr->name(), details->max_readings);
 	print(log_debug, "Config.local: %d", mtr->name(), options.local());
@@ -71,7 +70,7 @@ void *reading_thread(void *arg) {
 					print(log_info, "waiting %i seconds before next reading", mtr->name(),
 						  mtr->interval());
 					sleep(mtr->interval());
-				}
+				} 
 				first_reading = false;
 
 				/* fetch readings from meter and calculate delta */

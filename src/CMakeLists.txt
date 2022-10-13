@@ -46,6 +46,7 @@ set(libvz_srcs
   ${mqtt_srcs}
   MeterMap.cpp
   Json.cpp
+  Calculate.cpp
   )
 
 add_library(vz ${libvz_srcs})

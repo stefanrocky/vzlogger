@@ -49,7 +49,6 @@
 #ifdef ENABLE_MQTT
 #include "protocols/MeterMQTT.hpp"
 #endif
-//#include <protocols/.h>
 
 #define METER_DETAIL(NAME, CLASSNAME, DESC, MAX_RDS)                                               \
 	{ meter_protocol_##NAME, #NAME, DESC, MAX_RDS }
@@ -81,10 +80,10 @@ static const meter_details_t protocols[] = {
 	METER_DETAIL(none, NULL, NULL, 0),
 };
 
-Meter::Meter(std::list<Option> pOptions) : _name("meter") {
+Meter::Meter(const std::list<Option> &pOptions) : _name("meter") {
 	id = instances++;
 	OptionList optlist;
-
+	
 	// set meter name
 	std::stringstream oss;
 	oss << "mtr" << id;
@@ -232,6 +231,21 @@ Meter::Meter(std::list<Option> pOptions) : _name("meter") {
 		_interval = 0;
 	}
 
+    try {
+		const Option& opt = optlist.lookup(pOptions, "calculations");
+		Calculate::construct(_calculations, protocolId(), _name, opt);
+		
+		if (_calculations.size() > 0)
+			print(log_debug, "Meter has %u active calculations!", name(), _calculations.size());
+
+	} catch (vz::OptionNotFoundException &e) {
+	} catch (vz::VZException &e) {
+		std::stringstream oss;
+		oss << e.what();
+		print(log_alert, "Invalid calculations: %s", name(), oss.str().c_str());
+		throw;
+	}
+
 	print(log_debug, "Meter configured, %s.", name(), _enable ? "enabled" : "disabled");
 }
 
@@ -249,7 +263,27 @@ void Meter::open() {
 
 int Meter::close() { return _protocol->close(); }
 
-size_t Meter::read(std::vector<Reading> &rds, size_t n) { return _protocol->read(rds, n); }
+size_t Meter::read(std::vector<Reading> &rds, size_t n) { 
+	size_t max_readings = n; 
+	if (_calculations.size() && _channels > 0) {
+		// reserve reading space for calculations
+		max_readings = n * _channels / (_channels + _calculations.size());
+	}
+	
+	size_t ret = _protocol->read(rds, max_readings); 
+	if (ret > 0)
+		ret += Calculate::calculate(_calculations, rds, ret, n);
+	return ret;
+}
+
+size_t Meter::adapt_max_readings(size_t max_readings, size_t channels) {
+	_channels = channels;
+	if (_calculations.size() && _channels > 0) {
+		// reserve reading space for calculations
+		max_readings = max_readings * (channels + _calculations.size()) / channels;
+	}
+	return max_readings;
+}
 
 int meter_lookup_protocol(const char *name, meter_protocol_t *protocol) {
 	if (!name)

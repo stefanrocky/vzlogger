@@ -34,19 +34,23 @@
 #include <meter_protocol.hpp>
 #include <protocols/Protocol.hpp>
 #include <shared_ptr.hpp>
+#include "Calculate.hpp"
+
+//class MeterMap;
 
 class Meter {
 
   public:
 	typedef vz::shared_ptr<Meter> Ptr;
 
-	Meter(std::list<Option> options);
+	Meter(const std::list<Option>& options);
 	//	Meter(const Meter *mtr);
 	virtual ~Meter();
 
 	virtual void open();
 	virtual int close();
 	virtual size_t read(std::vector<Reading> &rds, size_t n);
+	virtual size_t adapt_max_readings(size_t max_readings, size_t channels);
 
 	// setter
 	void interval(const int i) { _interval = i; }
@@ -65,7 +69,7 @@ class Meter {
 
 	int aggtime() const { return _aggtime; }
 	bool aggFixedInterval() const { return _aggFixedInterval; }
-
+    
   private:
 	static int instances; // meter instance id (increasing counter)
 	// bool _thread_running;   				// flag if thread is started
@@ -85,7 +89,11 @@ class Meter {
 	int _aggtime;
 	bool _aggFixedInterval;
 
-	std::vector<Channel> channels; // channel for logging
+	std::vector<Calculate::Ptr> _calculations;	
+
+    // Unused
+	//std::vector<Channel> channels; // channel for logging
+	size_t _channels = 0;
 };
 
 typedef struct {
