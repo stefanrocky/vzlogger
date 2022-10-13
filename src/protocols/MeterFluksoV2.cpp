@@ -35,7 +35,7 @@
 
 #define FLUKSOV2_DEFAULT_FIFO "/var/run/spid/delta/out"
 
-MeterFluksoV2::MeterFluksoV2(std::list<Option> options) : Protocol("fluksov2") {
+MeterFluksoV2::MeterFluksoV2(const std::list<Option> &options) : Protocol("fluksov2") {
 	OptionList optlist;
 
 	try {

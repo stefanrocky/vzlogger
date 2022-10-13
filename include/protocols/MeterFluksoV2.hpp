@@ -31,7 +31,7 @@
 class MeterFluksoV2 : public vz::protocol::Protocol {
 
   public:
-	MeterFluksoV2(std::list<Option> options);
+	MeterFluksoV2(const std::list<Option> &options);
 	virtual ~MeterFluksoV2();
 
 	int open();

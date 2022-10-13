@@ -31,7 +31,7 @@
 class MeterExec : public vz::protocol::Protocol {
 
   public:
-	MeterExec(std::list<Option> options);
+	MeterExec(const std::list<Option> &options);
 	virtual ~MeterExec();
 
 	int open();

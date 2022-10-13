@@ -54,7 +54,7 @@
 
 #define SML_BUFFER_LEN 8096
 
-MeterSML::MeterSML(std::list<Option> options)
+MeterSML::MeterSML(const std::list<Option> &options)
 	: Protocol("sml"), _host(""), _device(""), BUFFER_LEN(SML_BUFFER_LEN) {
 	OptionList optlist;
 

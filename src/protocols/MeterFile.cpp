@@ -36,7 +36,7 @@
 #include "protocols/MeterFile.hpp"
 #include <VZException.hpp>
 
-MeterFile::MeterFile(std::list<Option> options) : Protocol("file"), _notify_fd(-1) {
+MeterFile::MeterFile(const std::list<Option> &options) : Protocol("file"), _notify_fd(-1) {
 	OptionList optlist;
 
 	try {

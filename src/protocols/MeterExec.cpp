@@ -37,7 +37,7 @@
 #include <sys/types.h>
 #include <unistd.h>
 
-MeterExec::MeterExec(std::list<Option> options) : Protocol("exec") {
+MeterExec::MeterExec(const std::list<Option> &options) : Protocol("exec") {
 	OptionList optlist;
 
 	try {

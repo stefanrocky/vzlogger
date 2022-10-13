@@ -106,7 +106,7 @@ class MeterS0 : public vz::protocol::Protocol {
 	};
 
   public:
-	MeterS0(std::list<Option> options, HWIF *hwif = 0, HWIF *hwif_dir = 0);
+	MeterS0(const std::list<Option> &options, HWIF *hwif = 0, HWIF *hwif_dir = 0);
 	virtual ~MeterS0();
 
 	int open();

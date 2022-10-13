@@ -35,7 +35,7 @@
 #include "protocols/MeterRandom.hpp"
 #include <VZException.hpp>
 
-MeterRandom::MeterRandom(std::list<Option> options) : Protocol("random") {
+MeterRandom::MeterRandom(const std::list<Option> &options) : Protocol("random") {
 	OptionList optlist;
 
 	_min = 0;

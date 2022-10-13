@@ -41,7 +41,7 @@
 class MeterSML : public vz::protocol::Protocol {
 
   public:
-	MeterSML(std::list<Option> options);
+	MeterSML(const std::list<Option> &options);
 	MeterSML(const MeterSML &mtr);
 	virtual ~MeterSML();
 

@@ -33,7 +33,7 @@ double ltqnorm(double p); /* forward declaration */
 class MeterRandom : public vz::protocol::Protocol {
 
   public:
-	MeterRandom(std::list<Option> options);
+	MeterRandom(const std::list<Option> &options);
 	virtual ~MeterRandom();
 
 	int open();

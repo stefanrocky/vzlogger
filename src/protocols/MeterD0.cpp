@@ -50,7 +50,7 @@
 
 #define STX 0x02
 
-MeterD0::MeterD0(std::list<Option> &options)
+MeterD0::MeterD0(const std::list<Option> &options)
 	: Protocol("d0"), _host(""), _device(""), _auto_ack(false), _wait_sync_end(false),
 	  _read_timeout_s(10), _baudrate_change_delay_ms(0), _reaction_time_ms(200) // default to 200ms
 	  ,

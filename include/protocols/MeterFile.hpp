@@ -31,7 +31,7 @@
 class MeterFile : public vz::protocol::Protocol {
 
   public:
-	MeterFile(std::list<Option> options);
+	MeterFile(const std::list<Option> &options);
 	virtual ~MeterFile();
 
 	int open();

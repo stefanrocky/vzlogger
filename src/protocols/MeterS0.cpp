@@ -37,7 +37,7 @@
 #include "protocols/MeterS0.hpp"
 #include <VZException.hpp>
 
-MeterS0::MeterS0(std::list<Option> options, HWIF *hwif, HWIF *hwif_dir)
+MeterS0::MeterS0(const std::list<Option> &options, HWIF *hwif, HWIF *hwif_dir)
 	: Protocol("s0"), _hwif(hwif), _hwif_dir(hwif_dir), _counter_thread_stop(false),
 	  _send_zero(false), _debounce_delay_ms(0), _nonblocking_delay_ns(1e5), _first_impulse(true) {
 	OptionList optlist;
