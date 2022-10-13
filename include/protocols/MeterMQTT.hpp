@@ -23,7 +23,7 @@
 class MeterMQTT : public vz::protocol::Protocol {
 
   public:
-	MeterMQTT(std::list<Option> options);
+	MeterMQTT(const std::list<Option> &options);
 	virtual ~MeterMQTT();
 
 	ssize_t read(std::vector<Reading> &rds, size_t rds_max);
@@ -39,11 +39,12 @@ class MeterMQTT : public vz::protocol::Protocol {
 	std::string _data_format;
 	std::string _data_query_time;
 	std::vector<std::string> _data_query_values;
+	std::vector<std::string> _read_pending;
 	// 0 = ms, 1 = s
 	int _time_unit;
 	bool _use_local_time;
 	bool _open;
-	
+		
 	ssize_t parse(const std::string& msg, std::vector<Reading> &rds, size_t rds_pos, size_t rds_max);
 	
 private:

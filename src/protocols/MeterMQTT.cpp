@@ -29,7 +29,7 @@
 #include <VZException.hpp>
 #include "Json.hpp"
 
-MeterMQTT::MeterMQTT(std::list<Option> options)
+MeterMQTT::MeterMQTT(const std::list<Option> &options)
 	: Protocol("mqtt") {
 	_open = false;
 	OptionList optlist;
@@ -131,7 +131,7 @@ MeterMQTT::MeterMQTT(std::list<Option> options)
 		print(log_alert, "Invalid time_unit: %s", name().c_str(), oss.str().c_str());
 		throw;
 	}
-
+	
 	print(log_info, "Initialized: subscription: %s", name().c_str(), _subscription.c_str());
 	for (size_t idx = 0; idx < _data_query_values.size(); idx++)
 		print(log_info, "data_query_value[%u]: %s", name().c_str(), idx, _data_query_values[idx].c_str());
@@ -167,23 +167,39 @@ int MeterMQTT::close() {
 }
 
 ssize_t MeterMQTT::read(std::vector<Reading> &rds, size_t rds_max) {
-	if (_open && mqttClient)	{
+	if (_open && mqttClient) {
 		std::vector<std::string> data;
-		size_t len = mqttClient->receive(_subscription, data);
-		if (len > 0) {
+		
+		if (_read_pending.size() == 0) {
+			mqttClient->receive(_subscription, data);
+		} else {
+			_read_pending.swap(data);
+			std::vector<std::string> data_add;
+			mqttClient->receive(_subscription, data_add);
+			data.insert(data.end(), data_add.begin(), data_add.end());
+		}
+			
+		if (data.size() > 0) {
 			size_t rds_pos = 0;
 			size_t parsed = 0;
 			if (rds.size() < rds_max)
 				rds_max = rds.size();
-			for (auto it = data.begin(); it != data.end() && rds_pos < rds_max; ++it) {				
+			std::vector<std::string>::iterator it = data.begin();			
+			for (; it != data.end() && rds_pos < rds_max; ++it) {				
 				ssize_t res = parse(*it, rds, rds_pos, rds_max);
 				if (res < 0) {
-					print(log_error, "Parsing aborted, %d data-messages lost", name().c_str(), data.size() - parsed);
+					print(log_warning, "Parsing aborted, %d data-messages queued again", name().c_str(), data.size() - parsed);
 					break;
 				}
 				parsed++;
 				rds_pos += res;				
 			}
+			
+			if (it != data.end()) {
+				data.erase(data.begin(), ++it);
+				data.swap(_read_pending);
+			} 
+			
 			return rds_pos;
 		}
 	}	
@@ -250,6 +266,7 @@ ssize_t MeterMQTT::parse(const std::string& msg, std::vector<Reading> &rds, size
 	}
 	
 	json_tokener_free(json_tok);
+		
 	return res;	
 }
 
