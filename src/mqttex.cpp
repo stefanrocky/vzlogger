@@ -8,11 +8,28 @@
 #define SUB_OFF 0
 #define SUB_ON 1
 #define SUB_RETRY_MAX 5
+#define SUB_PENDING 99
 #define SUB_SUCCESS 100
 
 // class impl.
 MqttClientEx::MqttClientEx(struct json_object *option) : MqttClient(option) {
 	print(log_finest, "constructor called", "mqttex");
+	
+	if (option) {
+		assert(json_object_get_type(option) == json_type_object);
+		json_object_object_foreach(option, key, local_value) {
+			enum json_type local_type = json_object_get_type(local_value);
+
+			if (strcmp(key, "qosSubscribe") == 0 && local_type == json_type_int) {
+				int qos = json_object_get_int(local_value);
+				if (qos >= 0 && qos <= 2) {
+					_qosSubscribe = qos;
+				} else {
+					print(log_alert, "Ignoring invalid QoS-Subscribe value %d, assuming default", NULL, qos);
+				}
+			}	
+		}
+	}
 }
 
 
@@ -43,7 +60,7 @@ void MqttClientEx::unsubscribe(const std::string& sub) {
 	auto it = _subscriptionMap.find(sub);	
 	if (it != _subscriptionMap.end()) {	
 		int state = (*it).second._state;		
-		auto unsubscribe = state == SUB_SUCCESS;
+		auto unsubscribe = state >= SUB_PENDING && _qosSubscribe == 0;
 		(*it).second._state = SUB_OFF;
 		std::unique_lock<std::mutex> lockData((*it).second._dataMutex);
 		(*it).second._data.clear();
@@ -71,10 +88,11 @@ size_t MqttClientEx::receive(const std::string& sub, std::vector<std::string>& d
 	if (it == _subscriptionMap.end())
 		return 0;
 	
-	auto& entry = (*it).second;
+	auto& entry = (*it).second;	
 	lock.unlock();
-	
+
 	update(sub, entry);
+	
 	std::unique_lock<std::mutex> lockData(entry._dataMutex);	
 	entry._data.swap(data);
 	return data.size();
@@ -86,10 +104,13 @@ void MqttClientEx::update(const std::string& sub, SubscriptionEntry& entry) {
 		
 	int state = entry._state;
 	if (state > SUB_OFF && state < SUB_RETRY_MAX) {
-		//int mid = 0;			
-		int res = mosquitto_subscribe(_mcs, NULL, sub.c_str(), 0);			
+		//int mid = 0;	
+		entry._state = SUB_PENDING;	
+			print(log_info, "subscribe \"%s\" (state: %d->%d) pending", "mqttex",
+				  sub.c_str(), state, entry._state);				  
+		int res = mosquitto_subscribe(_mcs, NULL, sub.c_str(), _qosSubscribe);			
 		if (res != MOSQ_ERR_SUCCESS) {			
-			entry._state++;
+			entry._state = state + 1;
 			if (entry._state < SUB_RETRY_MAX) {
 				print(log_warning, "subscribe \"%s\" (state: %d->%d) failed: %s", "mqttex",
 					  sub.c_str(), state, entry._state, mosquitto_strerror(res));
@@ -98,9 +119,10 @@ void MqttClientEx::update(const std::string& sub, SubscriptionEntry& entry) {
 					  sub.c_str(), state, entry._state, mosquitto_strerror(res));
 			}
 		} else {
+			state = entry._state;
 			entry._state = SUB_SUCCESS;
-			print(log_info, "subscribe \"%s\" (state: %d->%d) success", "mqttex",
-				  sub.c_str(), state, entry._state);
+			print(log_info, "subscribe \"%s\" (state: %d->%d) success, QoS=%d", "mqttex",
+				  sub.c_str(), state, entry._state, _qosSubscribe);
 		}							
 	}		
 }
@@ -152,8 +174,8 @@ void MqttClientEx::message_callback(struct mosquitto *mosq, const struct mosquit
 			  msg->topic, msg->mid);		
 
 	std::unique_lock<std::mutex> lock(_subscriptionMapMutex);	
-	auto it = _subscriptionMap.find(msg->topic);	
-	if (it != _subscriptionMap.end() && (*it).second._state == SUB_SUCCESS) {		
+	auto it = _subscriptionMap.find(msg->topic);		
+	if (it != _subscriptionMap.end() && (*it).second._state >= SUB_ON) {		
 		std::unique_lock<std::mutex> lockData((*it).second._dataMutex);	
 		std::string data((const char*)msg->payload, msg->payloadlen);
 		(*it).second._data.emplace_back(data);

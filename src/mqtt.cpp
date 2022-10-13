@@ -18,6 +18,7 @@ volatile bool endMqttClientThread = false;
 MqttClient::MqttClient(struct json_object *option) : _enabled(false) {
 
 	print(log_finest, "constructor called", "mqtt");
+		
 	if (option) {
 		assert(json_object_get_type(option) == json_type_object);
 		json_object_object_foreach(option, key, local_value) {
@@ -27,6 +28,10 @@ MqttClient::MqttClient(struct json_object *option) : _enabled(false) {
 				_enabled = json_object_get_boolean(local_value);
 			} else if (strcmp(key, "retain") == 0 && local_type == json_type_boolean) {
 				_retain = json_object_get_boolean(local_value);
+			} else if (strcmp(key, "retainAnnounce") == 0 && local_type == json_type_boolean) {
+				_retainAnnounce = json_object_get_boolean(local_value);
+			} else if (strcmp(key, "clean") == 0 && local_type == json_type_boolean) {
+				_clean = json_object_get_boolean(local_value);
 			} else if (strcmp(key, "rawAndAgg") == 0 && local_type == json_type_boolean) {
 				_rawAndAgg = json_object_get_boolean(local_value);
 			} else if (strcmp(key, "port") == 0 && local_type == json_type_int) {
@@ -65,6 +70,12 @@ MqttClient::MqttClient(struct json_object *option) : _enabled(false) {
 				_id = json_object_get_string(local_value);
 			} else if (strcmp(key, "generateTopicWithUuid") == 0 && local_type == json_type_boolean) {
 				_generateTopicWithUuid = json_object_get_boolean(local_value);
+			} else if (strcmp(key, "verifyServerCert") == 0 && local_type == json_type_boolean) {
+				_verifyServerCert = json_object_get_boolean(local_value);
+			} else if (strcmp(key, "sessionExpiry_s") == 0 && local_type == json_type_int) {
+				_sessionExpiry_s = json_object_get_int(local_value);
+			} else if (strcmp(key, "messageExpiry_s") == 0 && local_type == json_type_int) {
+				_messageExpiry_s = json_object_get_int(local_value);
 			} else {
 				print(log_alert, "Ignoring invalid field or type: %s=%s", NULL, key,
 					  json_object_get_string(local_value));
@@ -109,7 +120,7 @@ MqttClient::MqttClient(struct json_object *option) : _enabled(false) {
 			id.str(_id);
 		}
 
-		_mcs = mosquitto_new(id.str().c_str(), true, this);
+		_mcs = mosquitto_new(id.str().c_str(), _clean, this);
 		if (!_mcs) {
 			print(log_alert, "mosquitto_new failed! Stopped!", "mqtt");
 			_enabled = false;
@@ -146,16 +157,33 @@ MqttClient::MqttClient(struct json_object *option) : _enabled(false) {
 							memcpy(buf, keypass.data(), len);
 						return len;
 					});
+					
 				if (res != MOSQ_ERR_SUCCESS) {
 					print(log_warning, "mosquitto_tls_set failed: %s", "mqtt",
 						  mosquitto_strerror(res));
 				}
+				
+				if (!_verifyServerCert) { 
+					res = mosquitto_tls_opts_set(_mcs, 0, NULL, NULL);
+					if (res != MOSQ_ERR_SUCCESS) {
+						print(log_warning, "mosquitto_tls_opts_set/verifyServerCert failed: %s", "mqtt",
+							mosquitto_strerror(res));
+					}
+				}				
 			}
 
-			int protocol = MQTT_PROTOCOL_V311;
-			res = mosquitto_opts_set(_mcs, MOSQ_OPT_PROTOCOL_VERSION, &protocol);
+			int protocol = MQTT_PROTOCOL_V311;	
+			if (_sessionExpiry_s > 0 || _messageExpiry_s > 0) {
+				protocol = MQTT_PROTOCOL_V5;
+				if (_sessionExpiry_s > 0)
+					mosquitto_property_add_int32( &_propsConnect, 17, _sessionExpiry_s); // MQTT_PROP_SESSION_EXPIRY_INTERVAL=17
+				if (_messageExpiry_s > 0)
+					mosquitto_property_add_int32( &_propsPublish, 2, _messageExpiry_s); // MQTT_PROP_MESSAGE_EXPIRY_INTERVAL=2
+			}
+				
+			res = mosquitto_opts_set(_mcs, MOSQ_OPT_PROTOCOL_VERSION, &protocol);				
 			if (res != MOSQ_ERR_SUCCESS) {
-				print(log_warning, "unable to set MQTT protocol version (error %d)", "mqtt", res);
+				print(log_warning, "unable to set MQTT protocol version %d (error %d)", "mqtt", protocol, res);
 			}
 
 			mosquitto_connect_callback_set(_mcs, [](struct mosquitto *mosq, void *obj, int res) {
@@ -170,8 +198,10 @@ MqttClient::MqttClient(struct json_object *option) : _enabled(false) {
 					static_cast<MqttClient *>(obj)->message_callback(mosq, msg);
 				});
 
-			// now connect. we use sync interface with spe. thread calling mosquitto_loop
-			res = mosquitto_connect(_mcs, _host.c_str(), _port, _keepalive);
+			// now connect. we use sync interface with spe. thread calling mosquitto_loop			
+			res = _propsConnect == NULL ? mosquitto_connect(_mcs, _host.c_str(), _port, _keepalive) :
+				mosquitto_connect_bind_v5(_mcs, _host.c_str(), _port, _keepalive, NULL, _propsConnect);
+				
 			if (res != MOSQ_ERR_SUCCESS) {
 				switch (res) {
 				case MOSQ_ERR_CONN_REFUSED: // mqtt might accept us later only.
@@ -195,6 +225,9 @@ MqttClient::MqttClient(struct json_object *option) : _enabled(false) {
 					_enabled = false;
 					break;
 				}
+			} else {
+				print(log_info, "mosquitto_connect succeded: version=%d, id=%s, clean=%d, sessionExpiry(sec)=%d, messageExpiry(sec)=%d", "mqtt", 
+					protocol, id.str().c_str(), _clean, _sessionExpiry_s, _messageExpiry_s);
 			}
 		}
 	}
@@ -217,14 +250,19 @@ MqttClient::~MqttClient() {
 	if (_mcs) {
 		assert(!_enabled or endMqttClientThread);
 
-		mosquitto_disconnect(_mcs);
+		int res = _propsConnect == NULL? mosquitto_disconnect(_mcs) : mosquitto_disconnect_v5(_mcs, 0, _propsConnect);
 		// we call mosquitto_loop at least once here as the thread should be stopped already:
-		int res = mosquitto_loop(_mcs, 50, 1);
+		res = mosquitto_loop(_mcs, 50, 1);
 		if (res != MOSQ_ERR_SUCCESS and res != MOSQ_ERR_NO_CONN) {
 			print(log_warning, "mosquitto_loop returned: %s", "mqtt", mosquitto_strerror(res));
 		}
 		mosquitto_destroy(_mcs);
 	}
+	if(_propsConnect)
+		mosquitto_property_free_all(&_propsConnect);
+	if(_propsPublish)
+		mosquitto_property_free_all(&_propsPublish);
+		
 	mosquitto_lib_cleanup(); // this assumes nobody else is using libmosquitto!
 }
 
@@ -285,8 +323,9 @@ void MqttClient::publish(Channel::Ptr ch, Reading &rds, bool aggregate) {
 	if (!entry._announced && entry._announceValues.size()) {
 		for (auto &v : entry._announceValues) {
 			std::string name = entry._announceName + v.first;
-			int res = mosquitto_publish(_mcs, 0, name.c_str(), v.second.length(), v.second.c_str(),
-										_qos, _retain);
+			int res = _propsPublish == NULL? mosquitto_publish(_mcs, 0, name.c_str(), v.second.length(), v.second.c_str(), _qos, _retain || _retainAnnounce) :
+				mosquitto_publish_v5(_mcs, 0, name.c_str(), v.second.length(), v.second.c_str(), _qos, _retain || _retainAnnounce, _propsPublish);
+									
 			if (res != MOSQ_ERR_SUCCESS) {
 				print(log_finest, "mosquitto_publish announce \"%s\" failed: %s", "mqtt",
 					  name.c_str(), mosquitto_strerror(res));
@@ -313,8 +352,9 @@ void MqttClient::publish(Channel::Ptr ch, Reading &rds, bool aggregate) {
 
 		print(log_finest, "publish %s=%s", "mqtt", topic.c_str(), payload.c_str());
 
-		int res = mosquitto_publish(_mcs, 0, topic.c_str(), payload.length(), payload.c_str(), _qos,
-									_retain);
+		int res = _propsPublish == NULL? mosquitto_publish(_mcs, 0, topic.c_str(), payload.length(), payload.c_str(), _qos, _retain) :
+			mosquitto_publish_v5(_mcs, 0, topic.c_str(), payload.length(), payload.c_str(), _qos, _retain, _propsPublish);
+			
 		if (res != MOSQ_ERR_SUCCESS) {
 			print(log_finest, "mosquitto_publish failed: %s", "mqtt", mosquitto_strerror(res));
 		}

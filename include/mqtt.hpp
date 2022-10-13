@@ -14,6 +14,8 @@
 #include <vector>
 
 struct mosquitto; // forward decl. to avoid pulling the header here
+struct mqtt5__property;
+typedef struct mqtt5__property mosquitto_property;
 
 class MqttClient {
   public:
@@ -39,7 +41,7 @@ class MqttClient {
     
 	bool _enabled;
 	std::string _host;
-	int _port = 0;
+	int _port = 1883;
 	int _keepalive = 10;
 	std::string _user;
 	std::string _pwd;
@@ -48,17 +50,25 @@ class MqttClient {
 	std::string _certfile;
 	std::string _keyfile;
 	std::string _keypass;
+	bool _verifyServerCert = true;
 	bool _retain = false;
+	bool _retainAnnounce = false;
+	bool _clean = true;
 	bool _rawAndAgg = false;
 	std::string _topic;
 	std::string _id;
 	int _qos = 0;
 	bool _timestamp = false;
 	bool _generateTopicWithUuid = false;
+	int _sessionExpiry_s = 0;
+	int _messageExpiry_s = 0;
 
 	bool _isConnected = false;
 
 	struct mosquitto *_mcs = nullptr; // mosquitto client session data
+	
+	mosquitto_property *_propsConnect = nullptr;
+	mosquitto_property *_propsPublish = nullptr;
 
 	struct ChannelEntry {
 		bool _announced = false;

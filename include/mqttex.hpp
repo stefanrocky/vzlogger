@@ -28,6 +28,7 @@ class MqttClientEx : public MqttClient {
 	
 	std::mutex _subscriptionMapMutex;
 	std::unordered_map<std::string, SubscriptionEntry> _subscriptionMap;	
+	int _qosSubscribe = 0;
 	
 	void update();
 	void update(const std::string& sub, SubscriptionEntry& entry);
