@@ -7,6 +7,9 @@
 /* mqtt support */
 #cmakedefine ENABLE_MQTT 1
 
+/* modbus support */
+#cmakedefine ENABLE_MODBUS 1
+
 /* Name of package */
 #define PACKAGE "vzlogger"
 

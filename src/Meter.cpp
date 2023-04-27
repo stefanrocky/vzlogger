@@ -49,7 +49,9 @@
 #ifdef ENABLE_MQTT
 #include "protocols/MeterMQTT.hpp"
 #endif
-
+#ifdef ENABLE_MODBUS
+#include "protocols/MeterModbus.hpp"
+#endif
 #define METER_DETAIL(NAME, CLASSNAME, DESC, MAX_RDS)                                               \
 	{ meter_protocol_##NAME, #NAME, DESC, MAX_RDS }
 
@@ -75,6 +77,9 @@ static const meter_details_t protocols[] = {
 #endif
 #ifdef ENABLE_MQTT
 	METER_DETAIL(mqtt, MQTT, "MQTT subscriptions", 100),
+#endif
+#ifdef ENABLE_MODBUS
+	METER_DETAIL(modbus, MQTT, "Modbus register reading", 32),
 #endif
 	//{} /* stop condition for iterator */
 	METER_DETAIL(none, NULL, NULL, 0),
@@ -195,6 +200,12 @@ Meter::Meter(const std::list<Option> &pOptions) : _name("meter") {
 #ifdef ENABLE_MQTT
 	case meter_protocol_mqtt:
 		_protocol = vz::protocol::Protocol::Ptr(new MeterMQTT(pOptions));
+		_identifier = ReadingIdentifier::Ptr(new StringIdentifier());
+		break;
+#endif
+#ifdef ENABLE_MODBUS
+	case meter_protocol_modbus:
+		_protocol = vz::protocol::Protocol::Ptr(new MeterModbus(pOptions));
 		_identifier = ReadingIdentifier::Ptr(new StringIdentifier());
 		break;
 #endif

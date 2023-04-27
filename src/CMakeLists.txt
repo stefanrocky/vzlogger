@@ -71,6 +71,10 @@ if(ENABLE_MQTT)
 target_link_libraries(vzlogger ${MQTT_LIBRARY})
 endif(ENABLE_MQTT)
 
+if(ENABLE_MODBUS)
+target_link_libraries(vzlogger ${MODBUS_LIBRARY})
+endif(ENABLE_MODBUS)
+
 target_link_libraries(vzlogger ${LIBGCRYPT})
 target_link_libraries(vzlogger pthread m ${LIBUUID})
 target_link_libraries(vzlogger dl)

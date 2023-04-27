@@ -58,6 +58,9 @@ OPTION(ENABLE_LOCAL
 OPTION(ENABLE_MQTT
   "enable MQTT client support (def=yes)"
   On)
+OPTION(ENABLE_MODBUS
+  "enable support for Modbus meter (def=yes)"
+  On)  
 OPTION(WITH_READER
   "compile reader to for testing your meters (def=yes)])"
   On)
@@ -124,6 +127,21 @@ if(ENABLE_MQTT)
 else()
   message( STATUS "MQTT support disabled. If wanted use ENABLE_MQTT=On")
 endif(ENABLE_MQTT)
+
+if(ENABLE_MODBUS)
+  find_library(MODBUS_LIBRARY modbus)
+  find_path(MODBUS_INCLUDE_DIR modbus/modbus.h)
+  message( STATUS "search for libmodbus returned ${MODBUS_LIBRARY} and ${MODBUS_INCLUDE_DIR}")
+  if(MODBUS_LIBRARY AND MODBUS_INCLUDE_DIR)
+    message( STATUS "libmodbus found at ${MODBUS_LIBRARY}")
+    include_directories(${MODBUS_INCLUDE_DIR})
+  else()
+    set(ENABLE_MODBUS OFF)
+    message( WARNING "libmodbus not found. Disabled ENABLE_MODBUS. Consider installing libmodbus-dev package.")
+  endif(MODBUS_LIBRARY AND MODBUS_INCLUDE_DIR)
+else()
+  message( STATUS "Meter Modbus support disabled. If wanted use ENABLE_MODBUS=On")
+endif(ENABLE_MODBUS)
 
 if( ENABLE_OCR OR ENABLE_OCR_TESSERACT )
 	include(FindLeptonica)
@@ -268,6 +286,9 @@ endif(MICROHTTPD_FOUND)
 if(ENABLE_MQTT)
   message("             mqtt: -L${MQTT_LIBRARY} -I${MQTT_INCLUDE_DIR}")
 endif(ENABLE_MQTT)
+if(ENABLE_MODBUS)
+  message("             modbus: -L${MODBUS_LIBRARY} -I${MODBUS_INCLUDE_DIR}")
+endif(ENABLE_MODBUS)
 if(METEREXEC_ROOTACCESS)
   message("             MeterExec: root privileges")
 endif(METEREXEC_ROOTACCESS)

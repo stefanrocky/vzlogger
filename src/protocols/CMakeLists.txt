@@ -30,6 +30,12 @@ else ( ENABLE_MQTT )
   set(mqtt_srcs "")
 endif( ENABLE_MQTT )
 
+if( ENABLE_MODBUS )
+  set(modbus_srcs MeterModbus.cpp ../../include/protocols/MeterModbus.hpp)
+else ( ENABLE_MODBUS )
+  set(modbus_srcs "")
+endif( ENABLE_MODBUS )
+
 set(proto_srcs
   MeterS0.cpp ../../include/protocols/MeterS0.hpp
   MeterD0.cpp ../../include/protocols/MeterD0.hpp
@@ -42,6 +48,7 @@ set(proto_srcs
   MeterW1therm.cpp ../../include/protocols/MeterW1therm.hpp
   ${oms_srcs}
   ${mqtt_srcs}
+  ${modbus_srcs}
 )
 
 add_library(proto ${proto_srcs})
