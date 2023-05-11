@@ -186,7 +186,7 @@ ssize_t MeterModbus::read(std::vector<Reading> &rds, size_t rds_max) {
 			    uvalue = 0;
 			    shift = (cnt - 1) * 16;
 			    for(int n = 0; n < cnt; n++) {
-					uvalue |= regs[n] << shift;
+					uvalue |= ((uint64_t)regs[n]) << shift;
 					shift -= 16;
 				}	
 				if(IsNaN(uvalue, _register_type[idx], cnt * 2)) {
