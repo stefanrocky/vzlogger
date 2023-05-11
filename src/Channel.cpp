@@ -91,7 +91,38 @@ Channel::Channel(const std::list<Option> &pOptions, const std::string apiProtoco
 	} catch (vz::OptionNotFoundException &e) {
 		// using default value if not specified (from above)
 	} 
+	
+	try {
+		_mqttName = optlist.lookup_string(pOptions, "mqtt_name");
+	} catch (vz::OptionNotFoundException &e) {
+		// using default value if not specified (from above)
+	} 	
 
+	try {
+		_mqttDescription = optlist.lookup_string(pOptions, "mqtt_description");
+	} catch (vz::OptionNotFoundException &e) {
+		// using default value if not specified (from above)
+	} 	
+	try {
+		_mqttGroupKey = optlist.lookup_string(pOptions, "mqtt_group");
+		size_t pos = _mqttGroupKey.find_first_of( "./" );
+		if (pos != std::string::npos) {
+			_mqttGroupName = _mqttGroupKey.substr(pos + 1);
+			_mqttGroupKey.erase(pos);
+		}
+		if (!_mqttGroupKey.empty() && _mqttGroupName.empty()) {
+			_mqttGroupName = _mqttName;
+			if (_mqttGroupName.empty())
+				_mqttGroupName = _uuid;
+			if (_mqttGroupName.empty())
+				_mqttGroupName = _name;
+			if (_mqttGroupName.empty())
+				_mqttGroupKey.clear();
+		}
+	} catch (vz::OptionNotFoundException &e) {
+		// using default value if not specified (from above)
+	} 
+	
 	pthread_cond_init(&condition, NULL); // initialize thread syncronization helpers
 }
 

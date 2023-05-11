@@ -183,3 +183,46 @@ void MqttClientEx::message_callback(struct mosquitto *mosq, const struct mosquit
 			  (*it).first.c_str(), data.c_str());		
 	}		
 }
+
+void MqttClientEx::publish(Channel::Ptr ch, Reading &rds, bool aggregate)
+{
+	MqttClient::publish(ch, rds, aggregate);
+	
+	if (!aggregate)
+		return;		
+	if (!ch || ch->mqttGroupKey().empty())
+		return;
+	if (!_mcs)
+		return;			
+			
+	std::unique_lock<std::mutex> lock(_groupPublishMapMutex);	
+	auto& ref = _groupPublishMap[ch->mqttGroupKey()];
+	
+	ref._time = rds.time_ms();
+	ref._data[ch->mqttGroupName()] = rds.value();
+	std::string topic = ref._topic;
+	if (topic.empty() ) {
+		topic = _topic + ch->mqttGroupKey();
+		ref._topic = topic;
+	}
+	
+	struct json_object *payload_obj = json_object_new_object();
+	json_object_object_add(payload_obj, "timestamp", json_object_new_int64(ref._time));
+	for (auto it = ref._data.begin(); it != ref._data.end(); ++it) {
+		json_object_object_add(payload_obj, (*it).first.c_str(), json_object_new_double((*it).second));
+	}
+	
+	lock.unlock();
+	
+	std::string payload = json_object_to_json_string(payload_obj);
+	json_object_put(payload_obj);	
+	
+	print(log_finest, "publish group %s=%s", "mqtt", topic.c_str(), payload.c_str());
+
+	int res = _propsPublish == NULL? mosquitto_publish(_mcs, 0, topic.c_str(), payload.length(), payload.c_str(), _qos, _retain) :
+		mosquitto_publish_v5(_mcs, 0, topic.c_str(), payload.length(), payload.c_str(), _qos, _retain, _propsPublish);
+		
+	if (res != MOSQ_ERR_SUCCESS) {
+		print(log_finest, "mosquitto_publish failed: %s", "mqtt", mosquitto_strerror(res));
+	}	
+}

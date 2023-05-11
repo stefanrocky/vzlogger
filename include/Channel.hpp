@@ -108,6 +108,10 @@ class Channel {
 
 	int duplicates() const { return _duplicates; }
 	bool mqtt() const { return _mqtt; }
+	const std::string mqttName() const { return _mqttName; }
+	const std::string mqttDescription() const { return _mqttDescription; }
+	const std::string mqttGroupKey() const { return _mqttGroupKey; }
+	const std::string mqttGroupName() const { return _mqttGroupName; }
 
   private:
 	static int instances;
@@ -129,6 +133,10 @@ class Channel {
 	std::string _apiProtocol; // protocol of api to use for logging
 	int _duplicates;          // how to handle duplicate values (see conf)
 	bool _mqtt;               // whether output to via mqtt client is enabled
+	std::string _mqttName;    // name of mqtt topic. Default: UUID (when generateTopicWithUuid=true) or _name
+	std::string _mqttDescription;
+	std::string _mqttGroupKey; // whether output to via mqtt client should published to a "Group" message
+	std::string _mqttGroupName; // name of the Channel-Data inside the "Group". Default: _mqttName or UUID or _name
 };
 
 #endif /* _CHANNEL_H_ */

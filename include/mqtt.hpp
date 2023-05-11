@@ -26,7 +26,7 @@ class MqttClient {
 	bool isConfigured() const;
 	bool isConnected() const { return _isConnected; }
 	
-	void publish(Channel::Ptr ch, Reading &rds,
+	virtual void publish(Channel::Ptr ch, Reading &rds,
 				 bool aggregate = false); // thread safe, non blocking
 				 
 	virtual bool subscribe(const std::string& sub) { return false; }

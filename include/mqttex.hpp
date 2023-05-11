@@ -10,6 +10,7 @@ class MqttClientEx : public MqttClient {
 	MqttClientEx(const MqttClient &) = delete; // no copy constr.
 	~MqttClientEx() override;
 
+	void publish(Channel::Ptr ch, Reading &rds, bool aggregate = false) override; // thread safe, non blocking
 	bool subscribe(const std::string& sub) override;
 	void unsubscribe(const std::string& sub) override;
 	size_t receive(const std::string& sub, std::vector<std::string>& data) override;
@@ -33,6 +34,15 @@ class MqttClientEx : public MqttClient {
 	void update();
 	void update(const std::string& sub, SubscriptionEntry& entry);
 	void reset();
+	
+	struct GroupEntry {
+		std::string _topic;
+		int64_t _time = 0;
+		std::unordered_map<std::string, double> _data;
+	};
+		
+	std::mutex _groupPublishMapMutex;
+	std::unordered_map<std::string, GroupEntry> _groupPublishMap;		
 };
 
 #endif

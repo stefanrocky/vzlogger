@@ -270,7 +270,9 @@ void MqttClient::ChannelEntry::generateNames(const std::string &prefix, Channel 
 	_announceValues.clear();
 	_fullTopicRaw = prefix;
 	 std::string uuid = ch.uuid();
-	 if (generateTopicWithUuid && uuid.length())
+	 if (ch.mqttName().length())
+		_fullTopicRaw += ch.mqttName();
+	 else if (generateTopicWithUuid && uuid.length())
 		_fullTopicRaw += uuid;
 	 else
 		_fullTopicRaw += ch.name(); // todo this converts from std::string to const char and back...
@@ -293,6 +295,8 @@ void MqttClient::ChannelEntry::generateNames(const std::string &prefix, Channel 
 	_fullTopicAgg += "agg";	
 	if (uuid.length())
 		_announceValues.emplace_back("uuid", uuid);
+	if (ch.mqttDescription().length())
+		_announceValues.emplace_back("description", ch.mqttDescription());
 }
 
 void MqttClient::publish(Channel::Ptr ch, Reading &rds, bool aggregate) {
