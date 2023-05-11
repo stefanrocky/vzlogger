@@ -33,7 +33,7 @@ class Calculate {
 		DERIVATION // numeric derivation of >= 1 channels, examples: power from energy, power from energy-out (factor=-1) and energy-in (factor=1)
 	};
 	Calculate(const std::string &meterName, ReadingIdentifier::Ptr rid, OPERATION operation, long max_time_difference_same_data_ms = 10, 
-		long min_time_difference_derivation_s = 2, long max_time_difference_derivation_s = 60);
+		long min_time_difference_derivation_s = 2, long max_time_difference_derivation_s = 60, long negative_result_filter = 1);
 	
 	void addChannel(ReadingIdentifier::Ptr rid, double factor = 1.0);
 	size_t channels() const { return _channels.size(); }
@@ -54,6 +54,7 @@ class Calculate {
 	long _max_time_difference_same_data_ms;
 	long _min_time_difference_derivation_s;
 	long _max_time_difference_derivation_s;
+	long _negative_result_filter;
 	ReadingIdentifier::Ptr _identifier;
 	bool _initialized;
 	

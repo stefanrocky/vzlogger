@@ -22,7 +22,7 @@
 #include "Options.hpp"
 
 Calculate::Calculate(const std::string &meterName, ReadingIdentifier::Ptr rid, OPERATION operation, long max_time_difference_same_data_ms, 
-long min_time_difference_derivation_s, long max_time_difference_derivation_s) {
+long min_time_difference_derivation_s, long max_time_difference_derivation_s, long negative_result_filter) {
 	if (rid == NULL)
 		throw vz::VZException("argument 'rid' is invalid NULL"); 
 	
@@ -40,6 +40,7 @@ long min_time_difference_derivation_s, long max_time_difference_derivation_s) {
 	_max_time_difference_same_data_ms = max_time_difference_same_data_ms;
 	_min_time_difference_derivation_s = min_time_difference_derivation_s;
 	_max_time_difference_derivation_s = max_time_difference_derivation_s;
+	_negative_result_filter = negative_result_filter;
 	_initialized = false;
 	_pending_data_valid = false;
 	
@@ -84,6 +85,8 @@ void Calculate::addData(const std::vector<Reading> &rds, size_t rds_count) {
 		}
 		
 		if (_operation == Calculate::OPERATION::SUM) {
+			if (rd.value < 0)
+				rd.value *= _negative_result_filter;
 			_data.push_back(rd);
 		} else if (_operation == Calculate::OPERATION::DERIVATION) {
 			if (!_pending_data_valid) {
@@ -97,6 +100,8 @@ void Calculate::addData(const std::vector<Reading> &rds, size_t rds_count) {
 				} else if (dt > 0) {								
 					double value = ((rd.value - _pending_data.value) / dt);
 					_pending_data = rd;
+					if (value < 0)
+						value *= _negative_result_filter;
 					rd.value = value;
 					_data.push_back(rd);
 				}
@@ -226,12 +231,17 @@ void Calculate::construct(std::vector<Calculate::Ptr> &calculations, meter_proto
 				options.push_back(Option(key, val));
 			}
 				
-			const char *operation_str = optList.lookup_string(options, "operation");
+			std::string operation_str = optList.lookup_string(options, "operation");
 			Calculate::OPERATION operation;
-			if (strcmp(operation_str, "SUM") == 0)
+			
+			if (operation_str.find("SUM") == 0) {
 				operation = Calculate::OPERATION::SUM;
-			else if (strcmp(operation_str, "DERIVATION") == 0)
+				operation_str.erase(0, 3);
+			}
+			else if (operation_str.find("DERIVATION") == 0) {
 				operation = Calculate::OPERATION::DERIVATION;
+				operation_str.erase(0, 10);
+			}
 			else
 				throw vz::VZException("Operation not found!");
 				
@@ -258,8 +268,22 @@ void Calculate::construct(std::vector<Calculate::Ptr> &calculations, meter_proto
 				max_time_difference_derivation_s = 60;
 			}
 
+			int negative_result_filter;
+			try {
+				negative_result_filter = optList.lookup_int(options, "negative_result_filter");
+			} catch (vz::OptionNotFoundException &e) {	
+				if (operation_str == "+")
+					negative_result_filter = 0;
+				else if (operation_str == "^")
+					negative_result_filter = -1;
+				else
+					negative_result_filter = 1;
+			}
+
 			Calculate::Ptr calc;
-			calc.reset( new Calculate(meterName, rid, operation, max_time_difference_same_data_ms, min_time_difference_derivation_s, max_time_difference_derivation_s));
+			calc.reset( new Calculate(meterName, rid, operation, 
+				max_time_difference_same_data_ms, min_time_difference_derivation_s, max_time_difference_derivation_s,
+				negative_result_filter));
 			calc->addChannels(protocol, optList.lookup(options, "input_channels"));	
 			
 			if (calc->channels() == 0)
