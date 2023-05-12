@@ -20,6 +20,7 @@
 #include <algorithm>
 #include <unistd.h>
 #include "Options.hpp"
+#include <math.h>
 
 Calculate::Calculate(const std::string &meterName, ReadingIdentifier::Ptr rid, OPERATION operation, long max_time_difference_same_data_ms, 
 long min_time_difference_derivation_s, long max_time_difference_derivation_s, long negative_result_filter) {
@@ -64,6 +65,18 @@ void Calculate::addChannel(ReadingIdentifier::Ptr rid, double factor) {
 	_channels.push_back( cd );
 }
 	
+void Calculate::validateValue(double& value) const
+{
+	if (value < 0) {
+		if (_negative_result_filter == 0)
+			value = 0;
+		else if (_negative_result_filter == -1)
+			value = fabs(value);
+		else
+			value *= (double)_negative_result_filter;
+	}
+}
+	
 void Calculate::addData(const std::vector<Reading> &rds, size_t rds_count) {
 	_initialized = true;
 		
@@ -85,8 +98,7 @@ void Calculate::addData(const std::vector<Reading> &rds, size_t rds_count) {
 		}
 		
 		if (_operation == Calculate::OPERATION::SUM) {
-			if (rd.value < 0)
-				rd.value *= _negative_result_filter;
+			validateValue(rd.value);
 			_data.push_back(rd);
 		} else if (_operation == Calculate::OPERATION::DERIVATION) {
 			if (!_pending_data_valid) {
@@ -100,8 +112,7 @@ void Calculate::addData(const std::vector<Reading> &rds, size_t rds_count) {
 				} else if (dt > 0) {								
 					double value = ((rd.value - _pending_data.value) / dt);
 					_pending_data = rd;
-					if (value < 0)
-						value *= _negative_result_filter;
+					validateValue(value);
 					rd.value = value;
 					_data.push_back(rd);
 				}

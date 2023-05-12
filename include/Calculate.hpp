@@ -82,6 +82,8 @@ class Calculate {
 	double getDerivationTime_s(const reading_data *prd1, const reading_data *prd2) const;
 	
 	void addChannels(meter_protocol_t protocol, const Option& channel_config);	
+	
+	void validateValue(double& value) const;
 };
 
 #endif
