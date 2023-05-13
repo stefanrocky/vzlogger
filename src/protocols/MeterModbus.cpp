@@ -91,15 +91,22 @@ MeterModbus::MeterModbus(const std::list<Option> &options)
 		throw;		
 	}	
 	
-	for(std::vector<std::string>::iterator it = register_format.begin(); it != register_format.end(); ++it) {
+	for (std::vector<std::string>::iterator it = register_format.begin(); it != register_format.end(); ++it) {
 		std::string fmt = *it;
 		if(fmt.size() > 50) {
 			throw vz::OptionNotFoundException("register is to long, max 50 characters are allowed");
 		}
 		char str[52];
-		int value, size;
+		int value, size, flags;
 		char type;		
-		if(sscanf(fmt.c_str(), "%s %d %d %c", str, &value, &size, &type) != 4 || strlen(str) == 0 || value <= 0 || size <= 0 || size > 4 || 
+		
+		int ret = sscanf(fmt.c_str(), "%s %d %d %c %d", str, &value, &size, &type, &flags);
+		if (ret != 5) {
+			ret = sscanf(fmt.c_str(), "%s %d %d %c", str, &value, &size, &type);
+			flags = 0;
+		}
+		
+		if (!(ret == 4 || ret == 5) || strlen(str) == 0 || value <= 0 || size <= 0 || size > 4 || 
 		    !(type == 'u' || type == 's' || type == 'a' || type == 'b' || type == 'c' || type == 'd')) {
 			print(log_alert, "Invalid format of register: %s", name().c_str(), fmt.c_str());
 			throw vz::OptionNotFoundException("invalid format of register");
@@ -108,7 +115,8 @@ MeterModbus::MeterModbus(const std::list<Option> &options)
 		_register_value.push_back(value);
 		_register_size.push_back(size);
 		_register_type.push_back(type);
-		print(log_finest, "Adding register: %s %d %d %c", name().c_str(), str, value, size, type);
+		_register_flags.push_back(flags);		
+		print(log_finest, "Adding register: %s %d %d %c, flags=0x%x", name().c_str(), str, value, size, type, flags);
 	}
 }
 
@@ -116,15 +124,15 @@ MeterModbus::~MeterModbus() {
 }
 
 int MeterModbus::open() {
-	if(_mb == NULL) {
+	if (_mb == NULL) {
 	   _connected = false;
 	   _mb = modbus_new_tcp(_host.c_str(), _port);
 	   
-	   if(_mb == NULL) {
+	   if (_mb == NULL) {
 		   print(log_alert, "modbus_new_tcp failed: %s", name().c_str(), modbus_strerror(errno));
 		   return ERR;
 	   }
-	   if(_unitID) {
+	   if (_unitID) {
 		   if(modbus_set_slave(_mb, _unitID) != 0) {
 			   print(log_warning, "modbus_set_slave to unit_id=%d failed: %s", name().c_str(), _unitID, modbus_strerror(errno));
 		   }
@@ -134,33 +142,33 @@ int MeterModbus::open() {
 		   print(log_warning, "modbus_set_error_recovery failed: %s", name().c_str(), mdobus_strerror(errno));
 	   }*/
 	   _connected  = modbus_connect(_mb) == 0;
-	   if(!_connected) {
+	   if (!_connected) {
 		   print(log_warning, "modbus_connect failed: %s", name().c_str(), modbus_strerror(errno));
-	   }
-	     
+	   }	     	  
 	}	   
 	return SUCCESS;
 }
 
 int MeterModbus::close() {
-	if(_mb) {
+	if (_mb) {
 		if(_connected)
 			modbus_close(_mb);
 		_connected = false;
 		modbus_free(_mb);
 		_mb = NULL;
+		_register_state.clear();
 	}
 
 	return SUCCESS;
 }
 
 ssize_t MeterModbus::read(std::vector<Reading> &rds, size_t rds_max) {
-	if(_mb == NULL)
+	if (_mb == NULL)
 		return 0;
-	if(!_connected) {
+	if (!_connected) {
 		_connected  = modbus_connect(_mb) == 0;
 	}
-	if(!_connected)
+	if (!_connected)
 		return 0;
 		
 	uint16_t regs[4];
@@ -169,18 +177,21 @@ ssize_t MeterModbus::read(std::vector<Reading> &rds, size_t rds_max) {
 	uint64_t uvalue;
 	float fvalue;
 	
-	for(size_t idx = 0; idx < _register_name.size(); ++idx) {
-		if(_register_size[idx] > 4 || _register_size[idx] <= 0)
+	for (size_t idx = 0; idx < _register_name.size(); ++idx) {
+		if (_register_size[idx] > 4 || _register_size[idx] <= 0)
 			continue;
 		
 		int cnt = modbus_read_registers(_mb, _register_value[idx], _register_size[idx], regs);
-		if(cnt <= 0 || cnt != _register_size[idx]) {
+		if (cnt <= 0 || cnt != _register_size[idx]) {
 			print(log_finest, "modbus_read_registers failed (entering disconnected state): %s", name().c_str(), modbus_strerror(errno));
 			_connected = false;
+			_register_state.clear();
 			return rds_pos;
 		}		
 		
-		switch(_register_type[idx]) {
+		_register_state.resize(idx + 1);
+		
+		switch (_register_type[idx]) {
 			case 'u':
 			case 's':
 			    uvalue = 0;
@@ -189,10 +200,20 @@ ssize_t MeterModbus::read(std::vector<Reading> &rds, size_t rds_max) {
 					uvalue |= ((uint64_t)regs[n]) << shift;
 					shift -= 16;
 				}	
-				if(IsNaN(uvalue, _register_type[idx], cnt * 2)) {
-					print(log_finest, "modbus_read_registers skipping NaN value: %s=0x%llx", name().c_str(), _register_name[idx].c_str(), uvalue);
-					continue;
+				if (IsNaN(uvalue, _register_type[idx], cnt * 2)) {
+					
+					if ((_register_flags[idx] & 0x1) || ((_register_flags[idx] & 0x2) && _register_state[idx] != 2) ){
+						uvalue = 0;
+						_register_state[idx] = 2;
+					} else {
+						_register_state[idx] = 2;
+						print(log_finest, "modbus_read_registers skipping NaN value: %s=0x%llx", name().c_str(), _register_name[idx].c_str(), uvalue);
+						continue;
+					}
+				} else {
+					_register_state[idx] = 1;
 				}
+				
 				if(	_register_type[idx] == 'u')
 					rds[rds_pos].value((double)uvalue);				
 				else if(cnt == 1)
@@ -206,11 +227,13 @@ ssize_t MeterModbus::read(std::vector<Reading> &rds, size_t rds_max) {
 			case 'b':
 			case 'c':
 			case 'd':
-			    if(cnt != 2) {
+			    if (cnt != 2) {
+					_register_state[idx] = 2;
 					print(log_alert, "invalid size %d for float register-type: %c", name().c_str(), _register_size[idx], _register_type[idx]);
 					continue;
 				}
-				switch(_register_type[idx]) {
+				_register_state[idx] = 1;
+				switch (_register_type[idx]) {
 					case 'a': fvalue = modbus_get_float_abcd(regs); break;
 					case 'b': fvalue = modbus_get_float_badc(regs); break;
 					case 'c': fvalue = modbus_get_float_cdab(regs); break;
@@ -239,12 +262,12 @@ ssize_t MeterModbus::read(std::vector<Reading> &rds, size_t rds_max) {
 
 // Check for NaN values "Not a Number"
 bool MeterModbus::IsNaN(uint64_t value, char type, int byte_size) {
-	if(byte_size <= 0 || byte_size > 8)
+	if (byte_size <= 0 || byte_size > 8)
 		return true;
 		
 	uint64_t nan;
 	
-	switch(type) {
+	switch (type) {
 		case 'u': 
 		    nan = byte_size == 8 ? -1 : (1ULL << (byte_size * 8)) - 1;
 			return value == nan;

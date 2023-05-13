@@ -26,6 +26,8 @@ class MeterModbus : public vz::protocol::Protocol {
 	std::vector<int> _register_value;
 	std::vector<int> _register_size; // number of 16 bit blocks
 	std::vector<char> _register_type; // u=unsigned, i=signed, abcd=float
+	std::vector<int> _register_flags; // Flags: 0x1: IsNaN to 0-value, 0x2: IsNaN to 0-value once
+	std::vector<int> _register_state; // 0: nothing received, 1: last received OK, 2: last receive IsNaN 
 	
     modbus_t *_mb;		
     bool _connected;	
