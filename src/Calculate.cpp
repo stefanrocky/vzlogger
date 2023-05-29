@@ -123,7 +123,7 @@ void Calculate::addData(const std::vector<Reading> &rds, size_t rds_count) {
 				if (dt < 0) {
 					_pending_data = rd;
 				} else if (dt > 0) {								
-					double value = ((rd.value - _pending_data.value) / dt);
+					double value = ((rd.value - _pending_data.value) * 1000 / dt);
 					double time = _pending_data.time + dt / 2;
 					_pending_data = rd;
 					
