@@ -39,11 +39,12 @@ long min_time_difference_derivation_s, long max_time_difference_derivation_s, lo
 	_identifier = rid;
 	_operation = operation;
 	_max_time_difference_same_data_ms = max_time_difference_same_data_ms;
-	_min_time_difference_derivation_s = min_time_difference_derivation_s;
-	_max_time_difference_derivation_s = max_time_difference_derivation_s;
+	_min_time_difference_derivation_ms = min_time_difference_derivation_s * 1000;
+	_max_time_difference_derivation_ms = max_time_difference_derivation_s * 1000;
 	_negative_result_filter = negative_result_filter;
 	_initialized = false;
 	_pending_data_valid = false;
+	_last_data_valid = false;
 	
 	if (operation == Calculate::OPERATION::SUM)
 		_operationName.assign("SUM");
@@ -65,16 +66,22 @@ void Calculate::addChannel(ReadingIdentifier::Ptr rid, double factor) {
 	_channels.push_back( cd );
 }
 	
-void Calculate::validateValue(double& value) const
+void Calculate::validateData(reading_data& rd)
 {
-	if (value < 0) {
+	if (rd.value < 0) {
 		if (_negative_result_filter == 0)
-			value = 0;
+			rd.value = 0;
 		else if (_negative_result_filter == -1)
-			value = fabs(value);
+			rd.value = fabs(rd.value);
 		else
-			value *= (double)_negative_result_filter;
+			rd.value *= (double)_negative_result_filter;
 	}
+	
+	if (_last_data_valid && _last_data.time + 10 > rd.time)
+		rd.time = _last_data.time + 10;
+		
+    _last_data_valid = true;
+	_last_data = rd;	
 }
 	
 void Calculate::addData(const std::vector<Reading> &rds, size_t rds_count) {
@@ -90,30 +97,39 @@ void Calculate::addData(const std::vector<Reading> &rds, size_t rds_count) {
 	while (findChannelData(rds, rds_count, rds_pos, channels_pos)) {
 		
 		reading_data rd;
-		rds[channels_pos[0]].time_get(&rd.time);
-		rd.value = rds[channels_pos[0]].value() * _channels[0].factor;
+		rd.value = 0;
+		int64_t time;
 		
-		for (size_t idx = 1; idx < _channels.size(); idx++) {
+		for (size_t idx = 0; idx < _channels.size(); idx++) {
 			rd.value += rds[channels_pos[idx]].value() * _channels[idx].factor;
-		}
-		
-		if (_operation == Calculate::OPERATION::SUM) {
-			validateValue(rd.value);
+			time = rds[channels_pos[0]].time_ms();
+			// find latest (maximum) time
+			if (idx == 0 || rd.time < time) {
+				rd.time = time;
+			}
+		}				
+				
+		if (_operation == Calculate::OPERATION::SUM) {					
+			validateData(rd);
 			_data.push_back(rd);
+			
 		} else if (_operation == Calculate::OPERATION::DERIVATION) {
 			if (!_pending_data_valid) {
 				_pending_data_valid = true;
 				_pending_data = rd;
 				continue;
 			} else {
-				double dt = getDerivationTime_s(&_pending_data, &rd);
+				int64_t dt = getDerivationTime_ms(&_pending_data, &rd);
 				if (dt < 0) {
 					_pending_data = rd;
 				} else if (dt > 0) {								
 					double value = ((rd.value - _pending_data.value) / dt);
+					double time = _pending_data.time + dt / 2;
 					_pending_data = rd;
-					validateValue(value);
+					
 					rd.value = value;
+					rd.time = time;
+					validateData(rd);
 					_data.push_back(rd);
 				}
 			}
@@ -182,17 +198,18 @@ bool Calculate::hasSameTime(const Reading *prd1, const Reading *prd2) const {
 	return dt < _max_time_difference_same_data_ms;
 }
 
-double Calculate::getDerivationTime_s(const reading_data *prd1, const reading_data *prd2) const {
+int64_t Calculate::getDerivationTime_ms(const reading_data *prd1, const reading_data *prd2) const {
 	if(prd1 == prd2)
 		return 0;
 	if(prd1 == NULL)
 		return 0;
 		
     // dt in seconds
-	double dt = (prd2->time.tv_sec - prd1->time.tv_sec) + (prd2->time.tv_usec / 1e6) - (prd1->time.tv_usec / 1e6);
-	if (dt < 0 || dt > _max_time_difference_derivation_s)
+	//double dt = (prd2->time.tv_sec - prd1->time.tv_sec) + (prd2->time.tv_usec / 1e6) - (prd1->time.tv_usec / 1e6);
+	int64_t dt = prd2->time - prd1->time;
+	if (dt < 0 || dt > _max_time_difference_derivation_ms)
 		return -1;
-	if (dt < _min_time_difference_derivation_s)
+	if (dt < _min_time_difference_derivation_ms)
 		return 0;
 	return dt;
 }
@@ -207,7 +224,7 @@ size_t Calculate::readData(std::vector<Reading> &rds, size_t rds_pos, size_t rds
 			break;
 		rds[rds_pos].identifier(_identifier);
 		rds[rds_pos].value( _data[idx].value );
-		rds[rds_pos].time( _data[idx].time );
+		rds[rds_pos].time_from_ms( _data[idx].time );
 				
 		rds_pos++;
 		ret++;

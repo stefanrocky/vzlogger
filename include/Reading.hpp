@@ -187,7 +187,7 @@ class Reading {
 		_time.tv_sec = v.tv_sec;
 		_time.tv_usec = v.tv_nsec / 1e3;
 	}
-	void time_from_ms(int64_t &ms);
+	void time_from_ms(int64_t const &ms);
 	void time_from_double(double const &d);
 
 	void identifier(ReadingIdentifier *rid) { _identifier.reset(rid); }

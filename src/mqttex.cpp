@@ -197,13 +197,21 @@ void MqttClientEx::publish(Channel::Ptr ch, Reading &rds, bool aggregate)
 			
 	std::unique_lock<std::mutex> lock(_groupPublishMapMutex);	
 	auto& ref = _groupPublishMap[ch->mqttGroupKey()];
-	
-	ref._time = rds.time_ms();
+		
 	ref._data[ch->mqttGroupName()] = rds.value();
 	std::string topic = ref._topic;
+	
+	// initialize topic and time
 	if (topic.empty() ) {
 		topic = _topic + ch->mqttGroupKey();
 		ref._topic = topic;
+		ref._time = rds.time_ms();
+	} else {
+		int64_t time = rds.time_ms();
+		if (time > ref._time + 10)
+			ref._time = time;
+		else
+			ref._time += 10; // at least 10 ms later 
 	}
 	
 	struct json_object *payload_obj = json_object_new_object();

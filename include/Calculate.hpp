@@ -52,8 +52,8 @@ class Calculate {
 	OPERATION _operation;
 	std::string _operationName;
 	long _max_time_difference_same_data_ms;
-	long _min_time_difference_derivation_s;
-	long _max_time_difference_derivation_s;
+	long _min_time_difference_derivation_ms;
+	long _max_time_difference_derivation_ms;
 	long _negative_result_filter;
 	ReadingIdentifier::Ptr _identifier;
 	bool _initialized;
@@ -68,7 +68,7 @@ class Calculate {
 
 	struct reading_data
 	{
-		struct timeval time;
+		int64_t time;
 		double value;
 	};
 	
@@ -77,13 +77,16 @@ class Calculate {
 	bool _pending_data_valid;
 	reading_data _pending_data;
 	
+	bool _last_data_valid;
+	reading_data _last_data;
+		
 	bool findChannelData(const std::vector<Reading> &rds, size_t rds_max, size_t &rds_pos, std::vector<size_t> &channels_pos) const;	
 	bool hasSameTime(const Reading *prd1, const Reading *prd2) const;
-	double getDerivationTime_s(const reading_data *prd1, const reading_data *prd2) const;
+	int64_t getDerivationTime_ms(const reading_data *prd1, const reading_data *prd2) const;
 	
 	void addChannels(meter_protocol_t protocol, const Option& channel_config);	
 	
-	void validateValue(double& value) const;
+	void validateData(reading_data& rd);
 };
 
 #endif
